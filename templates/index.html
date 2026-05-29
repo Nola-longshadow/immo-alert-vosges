@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🏠 Alertes Immo Vosges</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #2c5282, #4299e1);
+      color: white;
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 1.6rem; }
+    header p { font-size: 0.9rem; opacity: 0.85; margin-top: 4px; }
+    .btn {
+      background: white;
+      color: #2c5282;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #ebf8ff; transform: translateY(-1px); }
+    .btn-scan { background: #48bb78; color: white; }
+    .btn-scan:hover { background: #38a169; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .stat-card .number { font-size: 2rem; font-weight: bold; color: #4299e1; }
+    .stat-card .label { font-size: 0.85rem; color: #718096; margin-top: 4px; }
+
+    .criteres-box {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 32px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .criteres-box h2 { margin-bottom: 14px; color: #2c5282; }
+    .criteres-grid {
+      display: flex; flex-wrap: wrap; gap: 10px;
+    }
+    .critere-tag {
+      background: #ebf8ff;
+      color: #2c5282;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      border: 1px solid #bee3f8;
+    }
+
+    h2.section-title {
+      font-size: 1.3rem; margin-bottom: 20px; color: #2d3748;
+    }
+
+    .annonce-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 5px solid #4299e1;
+      transition: transform 0.2s;
+    }
+    .annonce-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+    .annonce-card.score-high { border-left-color: #48bb78; }
+    .annonce-card.score-mid  { border-left-color: #ed8936; }
+    .annonce-card.score-low  { border-left-color: #fc8181; }
+
+    .annonce-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 12px;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .annonce-source {
+      font-weight: bold; font-size: 1.05rem; color: #2c5282;
+    }
+    .annonce-date { font-size: 0.85rem; color: #a0aec0; }
+    .score-badge {
+      font-weight: bold; font-size: 1.1rem;
+      padding: 4px 14px;
+      border-radius: 20px;
+      background: #ebf8ff;
+      color: #2c5282;
+    }
+    .score-badge.high { background: #f0fff4; color: #276749; }
+    .score-badge.mid  { background: #fffaf0; color: #c05621; }
+    .score-badge.low  { background: #fff5f5; color: #c53030; }
+
+    .annonce-infos {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      margin-bottom: 12px;
+    }
+    .info-pill {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 4px 12px;
+      font-size: 0.9rem;
+    }
+    .info-pill.loyer { background: #f0fff4; border-color: #9ae6b4; font-weight: bold; }
+
+    .raisons { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .raison {
+      font-size: 0.85rem;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+    .raison.ok { background: #f0fff4; color: #276749; }
+    .raison.ko { background: #fff5f5; color: #c53030; }
+
+    .annonce-link {
+      display: inline-block;
+      background: #4299e1;
+      color: white;
+      padding: 8px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: bold;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+    .annonce-link:hover { background: #2c5282; }
+
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a0aec0;
+    }
+    .empty .icon { font-size: 3rem; margin-bottom: 12px; }
+
+    .actions { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: #a0aec0;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 600px) {
+      header { flex-direction: column; gap: 12px; text-align: center; }
+      .annonce-header { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🏠 Alertes Immo Vosges</h1>
+    <p>Surveillance automatique des annonces de location</p>
+  </div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn btn-scan" onclick="forceScan()">🔍 Scanner maintenant</button>
+    <button class="btn" onclick="testTelegram()">📱 Tester Telegram</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="number" id="nb-total">{{ alertes|length }}</div>
+      <div class="label">Annonces analysées</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" id="nb-ok" style="color:#48bb78">
+        {{ alertes | selectattr('score', 'ge', 50) | list | length }}
+      </div>
+      <div class="label">Bonnes annonces</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" id="nb-ko" style="color:#fc8181">
+        {{ alertes | selectattr('score', 'lt', 0) | list | length }}
+      </div>
+      <div class="label">Annonces filtrées</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" style="color:#ed8936" id="refresh-timer">2:00</div>
+      <div class="label">Prochain scan</div>
+    </div>
+  </div>
+
+  <!-- Critères -->
+  <div class="criteres-box">
+    <h2>📋 Critères actifs</h2>
+    <div class="criteres-grid">
+      <span class="critere-tag">📍 Zone : 15 min de St-Étienne-lès-Remiremont</span>
+      <span class="critere-tag">💶 Loyer ≤ {{ criteres.loyer_max }} €</span>
+      <span class="critere-tag">🏠 {{ criteres.pieces_min }} pièces min</span>
+      <span class="critere-tag">🛏️ {{ criteres.chambres_min }} chambres min</span>
+      <span class="critere-tag">🌿 DPE ≤ {{ criteres.dpe_max }}</span>
+      <span class="critere-tag">🔥 Chauffage électrique ou pellets</span>
+      <span class="critere-tag">⭐ Bonus : terrain, parking, cour</span>
+      <span class="critere-tag">⚠️ Éviter : combles/mansardé</span>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <h2 class="section-title" style="flex:1">📬 Annonces reçues</h2>
+    <button class="btn" onclick="rafraichir()">↻ Rafraîchir</button>
+  </div>
+
+  <!-- Annonces -->
+  <div id="annonces-list">
+    {% if alertes %}
+      {% for a in alertes %}
+      <div class="annonce-card {% if a.score >= 50 %}score-high{% elif a.score >= 0 %}score-mid{% else %}score-low{% endif %}">
+        <div class="annonce-header">
+          <div>
+            <div class="annonce-source">{{ a.source }}</div>
+            <div class="annonce-date">⏰ {{ a.date }}</div>
+          </div>
+          <div class="score-badge {% if a.score >= 50 %}high{% elif a.score >= 0 %}mid{% else %}low{% endif %}">
+            Score : {{ a.score }}
+          </div>
+        </div>
+
+        <div class="annonce-infos">
+          {% if a.loyer %}<span class="info-pill loyer">💶 {{ a.loyer }} €/mois</span>{% endif %}
+          {% if a.pieces %}<span class="info-pill">🏠 {{ a.pieces }} pièces</span>{% endif %}
+          {% if a.chambres %}<span class="info-pill">🛏️ {{ a.chambres }} chambres</span>{% endif %}
+          {% if a.surface %}<span class="info-pill">📐 {{ a.surface }} m²</span>{% endif %}
+          {% if a.dpe %}<span class="info-pill">🌿 DPE {{ a.dpe }}</span>{% endif %}
+        </div>
+
+        <div class="raisons">
+          {% for r in a.raisons_ok %}<span class="raison ok">{{ r }}</span>{% endfor %}
+          {% for r in a.raisons_ko %}<span class="raison ko">{{ r }}</span>{% endfor %}
+        </div>
+
+        {% if a.links %}
+          <a class="annonce-link" href="{{ a.links[0] }}" target="_blank">🔗 Voir l'annonce</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <div class="icon">🔍</div>
+        <p><strong>En attente des premières annonces...</strong></p>
+        <p style="margin-top:8px">Configure tes alertes sur Leboncoin, SeLoger et PAP, puis le système les analysera automatiquement.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<footer>
+  🏠 Alertes Immo Vosges — Scan toutes les 2 minutes — Alertes Telegram instantanées
+</footer>
+
+<script>
+  // Compte à rebours
+  let seconds = 120;
+  function updateTimer() {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    document.getElementById('refresh-timer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    if (seconds <= 0) { seconds = 120; rafraichir(); }
+    else seconds--;
+  }
+  setInterval(updateTimer, 1000);
+
+  function forceScan() {
+    fetch('/api/scan').then(() => {
+      setTimeout(rafraichir, 2000);
+      alert('✅ Scan lancé !');
+    });
+  }
+
+  function testTelegram() {
+    fetch('/api/test-telegram').then(() => alert('📱 Message de test envoyé sur Telegram !'));
+  }
+
+  function rafraichir() {
+    fetch('/api/alertes')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('nb-total').textContent = data.length;
+        location.reload();
+      });
+  }
+</script>
+
+</body>
+</html>
