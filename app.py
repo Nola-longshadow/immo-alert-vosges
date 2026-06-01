@@ -85,45 +85,104 @@ def send_telegram(message):
         log.error(f"Erreur Telegram : {e}")
 
 # ─── Extraction du texte d'un email ────────────────────────────────────────────
-def get_email_text(msg):
-    body = ""
-    if msg.is_multipart():
-        for part in msg.walk():
-            ctype = part.get_content_type()
-            if ctype == "text/plain":
-                try:
-                    body += part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                except:
-                    pass
-            elif ctype == "text/html":
-                try:
-                    html = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                    soup = BeautifulSoup(html, "html.parser")
-                    body += soup.get_text(separator=" ")
-                except:
-                    pass
-    else:
-        try:
-            body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
-        except:
-            pass
-    return body.lower()
-
-def get_email_links(msg):
-    links = []
+def get_email_html(msg):
+    """Retourne le HTML brut de l'email (prioritaire sur text/plain)."""
+    html_parts = []
     if msg.is_multipart():
         for part in msg.walk():
             if part.get_content_type() == "text/html":
                 try:
-                    html = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                    soup = BeautifulSoup(html, "html.parser")
-                    for a in soup.find_all("a", href=True):
-                        href = a["href"]
-                        if any(site in href for site in ["leboncoin", "seloger", "pap.fr", "bienici", "logic-immo", "maison-foret"]):
-                            links.append(href)
+                    html_parts.append(part.get_payload(decode=True).decode("utf-8", errors="ignore"))
                 except:
                     pass
-    return list(set(links))
+    else:
+        if msg.get_content_type() == "text/html":
+            try:
+                html_parts.append(msg.get_payload(decode=True).decode("utf-8", errors="ignore"))
+            except:
+                pass
+    return "\n".join(html_parts)
+
+def get_email_text(msg):
+    """Extrait le texte lisible depuis HTML (+ text/plain en fallback)."""
+    body = ""
+
+    # Priorité au HTML — meilleure source pour Leboncoin
+    html_raw = get_email_html(msg)
+    if html_raw:
+        soup = BeautifulSoup(html_raw, "html.parser")
+        # Supprime les balises script/style
+        for tag in soup(["script", "style", "head"]):
+            tag.decompose()
+        body = soup.get_text(separator=" ", strip=True)
+
+    # Fallback text/plain si rien trouvé
+    if not body and msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain":
+                try:
+                    body += part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                except:
+                    pass
+
+    return body.lower()
+
+def resoudre_lien(href):
+    """Suit les redirections pour obtenir le vrai lien de l'annonce."""
+    try:
+        r = requests.head(href, allow_redirects=True, timeout=8,
+                          headers={"User-Agent": "Mozilla/5.0"})
+        url_finale = r.url
+        # Nettoie les paramètres de tracking superflus
+        if "?" in url_finale:
+            base = url_finale.split("?")[0]
+            # Garde l'URL propre si c'est une annonce
+            if any(site in base for site in ["leboncoin.fr/ad/", "seloger.com", "pap.fr", "bienici.com", "logic-immo.com"]):
+                return base
+        return url_finale
+    except Exception as e:
+        log.warning(f"Impossible de résoudre le lien {href[:60]}... : {e}")
+        return href
+
+def get_email_links(msg):
+    """Extrait tous les liens pertinents depuis l'email et résout les redirections."""
+    liens_bruts = []
+    html_raw = get_email_html(msg)
+
+    if html_raw:
+        soup = BeautifulSoup(html_raw, "html.parser")
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if not href or href.startswith("mailto:") or href == "#":
+                continue
+            # Accepte les liens directs ET les liens de redirection/tracking
+            if any(mot in href.lower() for mot in [
+                "leboncoin", "seloger", "pap.fr", "bienici", "logic-immo",
+                "redirect", "tracking", "click", "go.", "lien", "annonce",
+                "location", "appartement", "maison", "immo"
+            ]):
+                liens_bruts.append(href)
+            # Aussi : liens qui ressemblent à des annonces même sans mot-clé immo
+            elif re.search(r"https?://[^\"']+/(?:ad|annonce|location|vente)/", href):
+                liens_bruts.append(href)
+
+    # Déduplique
+    liens_bruts = list(dict.fromkeys(liens_bruts))
+
+    # Résout les redirections pour les premiers liens (max 3 pour ne pas ralentir)
+    liens_resolus = []
+    for href in liens_bruts[:5]:
+        lien_final = resoudre_lien(href)
+        # Garde seulement si c'est bien une annonce immobilière
+        if any(site in lien_final for site in [
+            "leboncoin.fr", "seloger.com", "pap.fr", "bienici.com", "logic-immo.com",
+            "laforet.com", "century21.fr", "orpi.com"
+        ]):
+            if lien_final not in liens_resolus:
+                liens_resolus.append(lien_final)
+
+    # Si aucun lien résolu, retourne les bruts en fallback
+    return liens_resolus if liens_resolus else liens_bruts[:3]
 
 # ─── Extraction des données de l'annonce ───────────────────────────────────────
 def extraire_loyer(texte):
@@ -260,6 +319,24 @@ def analyser_email(msg):
             source = site.capitalize()
             break
 
+    # Extrait un titre et une description lisibles depuis le HTML
+    titre = ""
+    description = ""
+    html_raw = get_email_html(msg)
+    if html_raw:
+        soup = BeautifulSoup(html_raw, "html.parser")
+        # Cherche le titre de l'annonce
+        for sel in ["h1", "h2", "h3", ".title", "[class*='title']", "[class*='subject']"]:
+            el = soup.select_one(sel)
+            if el and len(el.get_text(strip=True)) > 5:
+                titre = el.get_text(strip=True)[:120]
+                break
+        # Extrait une description propre
+        texte_propre = " ".join(texte.split())
+        phrases = [p.strip() for p in texte_propre.split(".") if len(p.strip()) > 30]
+        if phrases:
+            description = ". ".join(phrases[:2])[:250]
+
     return {
         "score": score,
         "loyer": loyer,
@@ -271,6 +348,8 @@ def analyser_email(msg):
         "links": links,
         "raisons_ok": raisons_ok,
         "raisons_ko": raisons_ko,
+        "titre": titre,
+        "description": description,
         "texte_extrait": texte[:300]
     }
 
