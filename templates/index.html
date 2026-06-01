@@ -136,8 +136,32 @@
     .raison.ok { background: #f0fff4; color: #276749; }
     .raison.ko { background: #fff5f5; color: #c53030; }
 
-    .annonce-link {
+    .annonce-titre {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 3px 0 5px 0;
+    }
+    .annonce-description {
+      font-size: 0.88rem;
+      color: #4a5568;
+      background: #f7fafc;
+      border-left: 3px solid #bee3f8;
+      padding: 8px 12px;
+      border-radius: 0 6px 6px 0;
+      margin: 10px 0;
+      line-height: 1.5;
+    }
+    .annonce-link-missing {
       display: inline-block;
+      background: #fff5f5;
+      color: #c53030;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-top: 8px;
+      border: 1px solid #fed7d7;
+    }
       background: #4299e1;
       color: white;
       padding: 8px 18px;
@@ -240,6 +264,7 @@
         <div class="annonce-header">
           <div>
             <div class="annonce-source">{{ a.source }}</div>
+            {% if a.titre %}<div class="annonce-titre">{{ a.titre }}</div>{% endif %}
             <div class="annonce-date">⏰ {{ a.date }}</div>
           </div>
           <div class="score-badge {% if a.score >= 50 %}high{% elif a.score >= 0 %}mid{% else %}low{% endif %}">
@@ -260,8 +285,14 @@
           {% for r in a.raisons_ko %}<span class="raison ko">{{ r }}</span>{% endfor %}
         </div>
 
-        {% if a.links %}
-          <a class="annonce-link" href="{{ a.links[0] }}" target="_blank">🔗 Voir l'annonce</a>
+        {% if a.description %}
+          <div class="annonce-description">{{ a.description }}</div>
+        {% endif %}
+
+        {% if a.links and a.links|length > 0 %}
+          <a class="annonce-link" href="{{ a.links[0] }}" target="_blank" rel="noopener">🔗 Voir l'annonce</a>
+        {% else %}
+          <span class="annonce-link-missing">⚠️ Lien non disponible — vérifie ton email</span>
         {% endif %}
       </div>
       {% endfor %}
